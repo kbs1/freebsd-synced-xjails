@@ -1,0 +1,27 @@
+This script allows you to sync multiple computers in multiple locations. Whole freebsd XJAIL is synced (mysql dbs, installed programs and their versions, their configurations).
+
+Running Xorg in a FreeBSD jail isn't currently possible without a kernel hack, based on kernel patches found in mailing lists. Included patches are adapted for latest kernels.
+
+Main script (xjail_install.sh) will prepare your vanilla installation for XJAILS, it will configure your system, recompile the kernel, install the base jail (using ezjail), will ask you about xorg conf, simply everyting you need to get up and running.
+
+The script then gives you a choice to either create a new default lxde desktop xjail or sync from existing unison server.
+
+You have the possibility to create multiple xjails, for example one for programming, one for watching movies etc.
+
+Second important script  is xjail_update.sh. You choose one machine that you will do the update on. You will update the host and the basejail, based on script's instructions. You will then sync the changes to the rest of the machines (and only update host system on them).
+
+Having this approach is highly benefical in terms that the only thing that must match between the synced computers is that they are able to execute the same instruction set (amd64 etc). All other hardware-specific drivers (video card, sound, chipset, storage....) are simply abstracted to the jail and the system is therefore transferable and functional.
+
+The script will modify your host system in a way that will allow you to log-in into a selected xjail using standard host's system login prompt. For each xjail, a special user account is created and copied to the jail with .profile scripts created on both sides that allow seamless entry into the jail, as if using a local account with local Xorg.
+
+Script displays a prompt each time you enter or exit a jail. This selection allows you to sync the jail to / from server, force (clone) it from / to server (therefore overriding any inappropriate changes you may have made), or in case of serious filesystem damage it allows you to drop the current jail FS on the disk and resync from server.
+
+Main advantage with this sync process is that you are syncing a jail that is not running, therefore it's stare can not change dutring the sync.
+
+There are some directories we do not want to sync. Those are carefully selected and excluded by default (/tmp, /var/run, etc).
+
+It is possible to mount *ANY* local filesystems into the jails that will never be synced (by means of jail's own fstab, which will be unmounted before syncing).
+
+The only downside is that allowing access to /dev/kmem (via kernel patch) to allow Xorg to run voids jails security. Therefore this setup / approach if targeted for personal use only and should not be used on machines where jail security is a must.
+
+Should you have any questions or bugs please raise an issue. And remember, no more sync issues / "I don't have <stuff> on this machine right now" moments! :)
