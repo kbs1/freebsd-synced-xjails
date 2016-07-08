@@ -1,0 +1,109 @@
+Index: sys/dev/drm/drmP.h
+===================================================================
+--- sys/dev/drm/drmP.h	(revision 297329)
++++ sys/dev/drm/drmP.h	(working copy)
+@@ -227,7 +227,9 @@
+
+ #define PAGE_ALIGN(addr) round_page(addr)
+ /* DRM_SUSER returns true if the user is superuser */
+-#if __FreeBSD_version >= 700000
++#if __FreeBSD_version >= 1000000
++#define DRM_SUSER(p)		(priv_check(p, PRIV_KMEM_WRITE) == 0)
++#elif __FreeBSD_version >= 700000
+ #define DRM_SUSER(p)		(priv_check(p, PRIV_DRIVER) == 0)
+ #else
+ #define DRM_SUSER(p)		(suser(p) == 0)
+Index: sys/kern/kern_jail.c
+===================================================================
+--- sys/kern/kern_jail.c	(revision 297329)
++++ sys/kern/kern_jail.c	(working copy)
+@@ -208,6 +208,7 @@
+ 	"allow.mount.fdescfs",
+ 	"allow.mount.linprocfs",
+ 	"allow.mount.linsysfs",
++	"allow.kmem",
+ };
+ const size_t pr_allow_names_size = sizeof(pr_allow_names);
+
+@@ -225,6 +226,7 @@
+ 	"allow.mount.nofdescfs",
+ 	"allow.mount.nolinprocfs",
+ 	"allow.mount.nolinsysfs",
++	"allow.nokmem",
+ };
+ const size_t pr_allow_nonames_size = sizeof(pr_allow_nonames);
+
+@@ -4033,6 +4035,27 @@
+ 	case PRIV_PROC_SETLOGINCLASS:
+ 		return (0);
+
++		/*
++		 * Allow access to /dev/io in a jail if the non-jailed admin
++		 * requests this and if /dev/io exists in the jail. This
++		 * allows Xorg to probe a card.
++		 */
++	case PRIV_IO:
++		if (cred->cr_prison->pr_allow & PR_ALLOW_KMEM)
++			return (0);
++		else
++			return (EPERM);
++
++		/*
++		 * Allow low level access to KMEM-like devices (e.g. to
++		 * allow Xorg to use DRI).
++		 */
++	case PRIV_KMEM_WRITE:
++		if (cred->cr_prison->pr_allow & PR_ALLOW_KMEM)
++			return (0);
++		else
++			return (EPERM);
++
+ 	default:
+ 		/*
+ 		 * In all remaining cases, deny the privilege request.  This
+@@ -4502,6 +4505,9 @@
+ SYSCTL_JAIL_PARAM(_allow_mount, zfs, CTLTYPE_INT | CTLFLAG_RW,
+     "B", "Jail may mount the zfs file system");
+
++SYSCTL_JAIL_PARAM(_allow, kmem, CTLTYPE_INT | CTLFLAG_RW,
++    "B", "Jail may access kmem-like devices (io, dri) if they exist");
++
+ #ifdef RACCT
+ void
+ prison_racct_foreach(void (*callback)(struct racct *racct,
+Index: sys/sys/jail.h
+===================================================================
+--- sys/sys/jail.h	(revision 297329)
++++ sys/sys/jail.h	(working copy)
+@@ -234,7 +234,8 @@
+ #define	PR_ALLOW_MOUNT_FDESCFS		0x1000
+ #define	PR_ALLOW_MOUNT_LINPROCFS	0x2000
+ #define	PR_ALLOW_MOUNT_LINSYSFS		0x4000
+-#define	PR_ALLOW_ALL			0x7fff
++#define	PR_ALLOW_KMEM			0x8000
++#define	PR_ALLOW_ALL			0xffff
+
+ /*
+  * OSD methods
+Index: usr.sbin/jail/jail.8
+===================================================================
+--- usr.sbin/jail/jail.8	(revision 297329)
++++ usr.sbin/jail/jail.8	(working copy)
+@@ -607,6 +607,17 @@
+ Sockets within a jail are normally restricted to IPv4, IPv6, local
+ (UNIX), and route.  This allows access to other protocol stacks that
+ have not had jail functionality added to them.
++.It Va allow.kmem
++Jailed processes may access
++.Pa /dev/kmem
++and similar devices (e.g. io, dri) if they have sufficient permission
++(via the usual file permissions).
++Note that the device files must exist within the jail for this parameter
++to be of any use;
++the default devfs ruleset for jails does not include any such devices.
++Giving a jail access to kernel memory obviates much of the security that
++jails offer, but can still be useful for other purposes.
++For example, this would allow the Xorg server to run inside a jail.
+ .El
+ .El
+ .Pp
