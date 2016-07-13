@@ -16,12 +16,12 @@ The script will modify your host system in a way that will allow you to log-in i
 
 Script displays a prompt each time you enter or exit a jail. This selection allows you to sync the jail to / from server, force (clone) it from / to server (therefore overriding any inappropriate changes you may have made), or in case of serious filesystem damage it allows you to drop the current jail FS on the disk and resync from server.
 
-Main advantage with this sync process is that you are syncing a jail that is not running, therefore it's stare can not change during the sync.
+Main advantage with this sync process is that you are syncing a jail that is not running, therefore it's state can not change during the sync.
 
 There are some directories we do not want to sync. Those are carefully selected and excluded by default (/tmp, /var/run, etc).
 
 It is possible to mount *ANY* local filesystems into the jails that will never be synced (by means of jail's own fstab, which will be unmounted before syncing).
 
-The only downside is that allowing access to /dev/kmem (via kernel patch) to allow Xorg to run voids jails security. Therefore this setup / approach if targeted for personal use only and should not be used on machines where jail security is a must.
+The only downside is that allowing access to /dev/kmem (via kernel patch) to allow Xorg to run voids jails security. Therefore this setup / approach is targeted for personal use only and should not be used on machines where jail security is a must.
 
 Should you have any questions or bugs please raise an issue. And remember, no more sync issues / "I don't have <stuff> on this machine right now" moments! :)
