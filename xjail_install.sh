@@ -576,7 +576,7 @@ RESET="[0m"
 . ~/xjail_config.sh
 
 # turn on numlock if requested (running in X mode)
-if [ "${NUMLOCK}" == "numlock" -a "${UISTYLE}" == "xorg" ]; then
+if [ "\${NUMLOCK}" == "numlock" -a "\${UISTYLE}" == "xorg" ]; then
 	numlockx
 fi
 
@@ -623,7 +623,7 @@ case "\${ANSWER}" in
 		if [ "\${DELETE}" == "y" -o "\${DELETE}" == "Y" -o "\${DELETE}" == "yes" -o "\${DELETE}" == "YES" ]; then
 			SYNC="true"
 			echo "\${GREEN}Stopping '\${JAILNAME}' jail...\${RESET}"
-			sudo ezjail-admin stop '\${JAILNAME}'
+			sudo ezjail-admin stop "\${JAILNAME}"
 			echo "\${GREEN}Deleting current jail filesystem...\${RESET}"
 			sudo chflags -R 0 /usr/jails/basejail
 			sudo find /usr/jails/basejail -mindepth 1 -delete
@@ -654,7 +654,7 @@ RESET="[0m"
 . ~/xjail_config.sh
 
 # turn on numlock if requested (running in X mode)
-if [ "${NUMLOCK}" == "numlock" -a "${UISTYLE}" == "xorg" ]; then
+if [ "\${NUMLOCK}" == "numlock" -a "\${UISTYLE}" == "xorg" ]; then
 	numlockx
 fi
 
