@@ -274,11 +274,11 @@ EOD
 	echo 'kern.maxfiles="25000"' >> /boot/loader.conf
 
 	echog "Adding ClientAliveInterval and ServerAliveInterval into ssh configs..."
-	echo "ClientAliveInterval 20" >> /etc/ssh/ssh_config
-	echo "ClientAliveCountMax 3" >> /etc/ssh/ssh_config
+	echo "ClientAliveInterval 20" >> /etc/ssh/sshd_config
+	echo "ClientAliveCountMax 3" >> /etc/ssh/sshd_config
 
-	echo "ServerAliveInterval 20" >> /etc/ssh/sshd_config
-	echo "ServerAliveCountMax 3" >> /etc/ssh/sshd_config
+	echo "ServerAliveInterval 20" >> /etc/ssh/ssh_config
+	echo "ServerAliveCountMax 3" >> /etc/ssh/ssh_config
 
 	echog "Generating public / private ssh key pair for root..."
 	ssh-keygen
