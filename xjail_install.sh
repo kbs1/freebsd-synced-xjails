@@ -283,7 +283,7 @@ EOD
 	echog "Generating public / private ssh key pair for root..."
 	ssh-keygen
 
-	read -p "${YELLOW}Please add current machine's hostname into you localhost pointing entries in /etc/hosts. Press enter to launch editor.${RESET}"
+	read -p "${YELLOW}Please add current machine's hostname into you localhost pointing entries in /etc/hosts. Press enter to launch editor.${RESET}" TMP
 	$EDITOR /etc/hosts
 
 	echog "Fixing ntpd 'leapfile expired less than X days ago' problem and enabling ntpd leapfile fetching in /etc/defaults/periodic.conf..."
