@@ -113,10 +113,10 @@ configureipbinds()
 	JAILIP="${2}"
 
 	echog "Configuring sshd and ntpd to listen only on '${JAILNAME}' jail IPv4 address..."
-	echo >> /usr/jails/"${JAILNAME}"/etc/ssh/sshd_config
-	echo -n "ListenAddress ${JAILIP}" >> /usr/jails/"${JAILNAME}"/etc/ssh/sshd_config
+	echo -ne "\nListenAddress ${JAILIP}" >> /usr/jails/"${JAILNAME}"/etc/ssh/sshd_config
+
 	echo "interface ignore wildcard" >> /usr/jails/"${JAILNAME}"/etc/ntp.conf
-	echo -n "interface listen ${JAILIP}" >> /usr/jails/"${JAILNAME}"/etc/ntp.conf
+	echo -ne "\ninterface listen ${JAILIP}" >> /usr/jails/"${JAILNAME}"/etc/ntp.conf
 
 	read -p "${YELLOW}NOTICE: the following jail files are NOT shared between machines as they contain jail specific IP binding data: /etc/ntp.conf, /etc/ssh/sshd_config. Press enter to continue.${RESET} " TEMP
 }
@@ -160,9 +160,13 @@ if [ "${STAGE}" == "1" ]; then
 
 			if [ "\${RECONFIGURE}" == "true" -a "\${interface}" == "${IFACE}" ]; then
 				sed -i '' '\$ d' /etc/ssh/sshd_config
+				sed -i '' '\$ d' /etc/ssh/sshd_config
+
 				sed -i '' '\$ d' /etc/ntp.conf
-				echo -n "ListenAddress \${new_ip_address}" >> /etc/ssh/sshd_config
-				echo -n "interface listen \${new_ip_address}" >> /etc/ntp.conf
+				sed -i '' '\$ d' /etc/ntp.conf
+
+				echo -ne "\nListenAddress \${new_ip_address}" >> /etc/ssh/sshd_config
+				echo -ne "\ninterface listen \${new_ip_address}" >> /etc/ntp.conf
 
 				service sshd status > /dev/null
 				if [ \$? == 0 ]; then
@@ -185,9 +189,13 @@ if [ "${STAGE}" == "1" ]; then
 					JAILIP="\${FIRSTBYTES}"."\${IPBYTE}"
 
 					sed -i '' '\$ d' /usr/jails/"\${JAILNAME}"/etc/ssh/sshd_config
+					sed -i '' '\$ d' /usr/jails/"\${JAILNAME}"/etc/ssh/sshd_config
+
 					sed -i '' '\$ d' /usr/jails/"\${JAILNAME}"/etc/ntp.conf
-					echo -n "ListenAddress \${JAILIP}" >> /etc/ssh/sshd_config
-					echo -n "interface listen \${JAILIP}" >> /etc/ntp.conf
+					sed -i '' '\$ d' /usr/jails/"\${JAILNAME}"/etc/ntp.conf
+
+					echo -ne "\nListenAddress \${JAILIP}" >> /etc/ssh/sshd_config
+					echo -ne "\ninterface listen \${JAILIP}" >> /etc/ntp.conf
 
 					cp /etc/resolv.conf /usr/jails/"\${JAILNAME}"/etc/resolv.conf
 
@@ -257,9 +265,11 @@ EOD
 	echo 'kern.maxfiles="25000"' >> /boot/loader.conf
 
 	echog "Configuring sshd and ntpd to listen only on host's IP address (${CURHOSTIP})..."
-	echo -n "ListenAddress ${CURHOSTIP}" >> /etc/ssh/sshd_config
+	echo -ne "\nListenAddress ${CURHOSTIP}" >> /etc/ssh/sshd_config
+
+	echo >> /etc/ntp.conf
 	echo "interface ignore wildcard" >> /etc/ntp.conf
-	echo -n "interface listen ${CURHOSTIP}" >> /etc/ntp.conf
+	echo -ne "\ninterface listen ${CURHOSTIP}" >> /etc/ntp.conf
 
 	echog "Configuring syslog to operate in safe mode (logging only to hosts's filesystem)..."
 	echo 'syslogd_flags="-ss"' >> /etc/rc.conf
@@ -848,7 +858,8 @@ if [ "${ANSWER}" == "y" -o "${ANSWER}" == "Y" -o "${ANSWER}" == "YES" -o "${ANSW
 	cp /etc/ssh/sshd_config /usr/jails/"${JAILNAME}"/etc/ssh/sshd_config
 	cp /etc/ntp.conf /usr/jails/"${JAILNAME}"/etc/ntp.conf
 
-	# remove last 2 lines from ntp.conf added during install
+	# remove last 3 lines from ntp.conf added during install
+	sed -i '' '$ d' /usr/jails/"${JAILNAME}"/etc/ntp.conf
 	sed -i '' '$ d' /usr/jails/"${JAILNAME}"/etc/ntp.conf
 	sed -i '' '$ d' /usr/jails/"${JAILNAME}"/etc/ntp.conf
 
