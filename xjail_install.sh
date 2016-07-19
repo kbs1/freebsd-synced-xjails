@@ -113,10 +113,13 @@ configureipbinds()
 	JAILIP="${2}"
 
 	echog "Configuring sshd and ntpd to listen only on '${JAILNAME}' jail IPv4 address..."
-	echo -ne "\nListenAddress ${JAILIP}" >> /usr/jails/"${JAILNAME}"/etc/ssh/sshd_config
+	echo >> /usr/jails/"${JAILNAME}"/etc/ssh/sshd_config
+	echo -n "ListenAddress ${JAILIP}" >> /usr/jails/"${JAILNAME}"/etc/ssh/sshd_config
 
+	echo >> /usr/jails/"${JAILNAME}"/etc/ntp.conf
 	echo "interface ignore wildcard" >> /usr/jails/"${JAILNAME}"/etc/ntp.conf
-	echo -ne "\ninterface listen ${JAILIP}" >> /usr/jails/"${JAILNAME}"/etc/ntp.conf
+	echo >> /usr/jails/"${JAILNAME}"/etc/ntp.conf
+	echo -n "interface listen ${JAILIP}" >> /usr/jails/"${JAILNAME}"/etc/ntp.conf
 
 	read -p "${YELLOW}NOTICE: the following jail files are NOT shared between machines as they contain jail specific IP binding data: /etc/ntp.conf, /etc/ssh/sshd_config. Press enter to continue.${RESET} " TEMP
 }
@@ -165,8 +168,11 @@ if [ "${STAGE}" == "1" ]; then
 				sed -i '' '\$ d' /etc/ntp.conf
 				sed -i '' '\$ d' /etc/ntp.conf
 
-				echo -ne "\nListenAddress \${new_ip_address}" >> /etc/ssh/sshd_config
-				echo -ne "\ninterface listen \${new_ip_address}" >> /etc/ntp.conf
+				echo >> /etc/ssh/sshd_config
+				echo -n "ListenAddress \${new_ip_address}" >> /etc/ssh/sshd_config
+
+				echo >> /etc/ntp.conf
+				echo -n "interface listen \${new_ip_address}" >> /etc/ntp.conf
 
 				service sshd status > /dev/null
 				if [ \$? == 0 ]; then
@@ -194,8 +200,11 @@ if [ "${STAGE}" == "1" ]; then
 					sed -i '' '\$ d' /usr/jails/"\${JAILNAME}"/etc/ntp.conf
 					sed -i '' '\$ d' /usr/jails/"\${JAILNAME}"/etc/ntp.conf
 
-					echo -ne "\nListenAddress \${JAILIP}" >> /etc/ssh/sshd_config
-					echo -ne "\ninterface listen \${JAILIP}" >> /etc/ntp.conf
+					echo >> /etc/ssh/sshd_config
+					echo -n "ListenAddress \${JAILIP}" >> /etc/ssh/sshd_config
+
+					echo >> /etc/ntp.conf
+					echo -n "interface listen \${JAILIP}" >> /etc/ntp.conf
 
 					cp /etc/resolv.conf /usr/jails/"\${JAILNAME}"/etc/resolv.conf
 
@@ -264,12 +273,32 @@ EOD
 	echog "Increasing kernel maxfiles to 25000..."
 	echo 'kern.maxfiles="25000"' >> /boot/loader.conf
 
+	echog "Adding ClientAliveInterval and ServerAliveInterval into ssh configs..."
+	echo "ClientAliveInterval 20" >> /etc/ssh/ssh_config
+	echo "ClientAliveCountMax 3" >> /etc/ssh/ssh_config
+
+	echo "ServerAliveInterval 20" >> /etc/ssh/sshd_config
+	echo "ServerAliveCountMax 3" >> /etc/ssh/sshd_config
+
+	echog "Generating public / private ssh key pair for root..."
+	ssh-keygen
+
+	read -p "${YELLOW}Please add current machine's hostname into you localhost pointing entries in /etc/hosts. Press enter to launch editor.${RESET}"
+	$EDITOR /etc/hosts
+
+	echog "Fixing ntpd 'leapfile expired less than X days ago' problem and enabling ntpd leapfile fetching in /etc/defaults/periodic.conf..."
+	echo 'ntp_leapfile_sources="https://hpiers.obspm.fr/iers/bul/bulc/ntp/leap-seconds.list https://www.ietf.org/timezones/data/leap-seconds.list"' >> /etc/rc.conf
+	sed -i '' "s/daily_ntpd_leapfile_enable=\"NO\"/daily_ntpd_leapfile_enable=\"YES\"/g" /etc/defaults/periodic.conf
+	service ntpd onefetch
+
 	echog "Configuring sshd and ntpd to listen only on host's IP address (${CURHOSTIP})..."
-	echo -ne "\nListenAddress ${CURHOSTIP}" >> /etc/ssh/sshd_config
+	echo >> /etc/ssh/sshd_config
+	echo -n "ListenAddress ${CURHOSTIP}" >> /etc/ssh/sshd_config
 
 	echo >> /etc/ntp.conf
 	echo "interface ignore wildcard" >> /etc/ntp.conf
-	echo -ne "\ninterface listen ${CURHOSTIP}" >> /etc/ntp.conf
+	echo >> /etc/ntp.conf
+	echo -n "\ninterface listen ${CURHOSTIP}" >> /etc/ntp.conf
 
 	echog "Configuring syslog to operate in safe mode (logging only to hosts's filesystem)..."
 	echo 'syslogd_flags="-ss"' >> /etc/rc.conf
@@ -325,7 +354,7 @@ if [ "${STAGE}" == "2" ]; then
 
 	# download kernel patch
 	echog "Downloading kernel XJAILS patch..."
-	wget https://raw.githubusercontent.com/kbs1/freebsd-synced-xjails/master/freebsd_"${VERSION}"_xjails.patch
+	wget --no-check-certificate https://raw.githubusercontent.com/kbs1/freebsd-synced-xjails/master/freebsd_"${VERSION}"_xjails.patch
 
 	# patch the kernel
 	echog "Patching the kernel..."
@@ -629,9 +658,10 @@ case "\${ANSWER}" in
 		FORCE2=" -force ssh://\${SSH}/\${JAILROOT}"
 	;;
 	6* )
-		read -p "\${RED}DELETE current JAIL FS - are you sure? [N]\${RESET}" DELETE
+		read -p "\${RED}DELETE current JAIL FS - are you sure? [N] \${RESET}" DELETE
 		if [ "\${DELETE}" == "y" -o "\${DELETE}" == "Y" -o "\${DELETE}" == "yes" -o "\${DELETE}" == "YES" ]; then
 			SYNC="true"
+			BATCH_MODE=" -batch"
 			echo "\${GREEN}Stopping '\${JAILNAME}' jail...\${RESET}"
 			sudo ezjail-admin stop "\${JAILNAME}"
 			echo "\${GREEN}Deleting current jail filesystem...\${RESET}"
@@ -848,6 +878,7 @@ if [ "${ANSWER}" == "y" -o "${ANSWER}" == "Y" -o "${ANSWER}" == "YES" -o "${ANSW
 	find /usr/jails/basejail -mindepth 1 -delete
 	chflags -R 0 /usr/jails/"${JAILNAME}"
 	find /usr/jails/"${JAILNAME}" -mindepth 1 -delete
+	BATCH_MODE=" -batch"
 	eval "${UNISON_CMD1}"
 	eval "${UNISON_CMD2}"
 
@@ -858,12 +889,11 @@ if [ "${ANSWER}" == "y" -o "${ANSWER}" == "Y" -o "${ANSWER}" == "YES" -o "${ANSW
 	cp /etc/ssh/sshd_config /usr/jails/"${JAILNAME}"/etc/ssh/sshd_config
 	cp /etc/ntp.conf /usr/jails/"${JAILNAME}"/etc/ntp.conf
 
-	# remove last 3 lines from ntp.conf added during install
-	sed -i '' '$ d' /usr/jails/"${JAILNAME}"/etc/ntp.conf
+	# remove last 2 lines from ntp.conf containing binded ip address
 	sed -i '' '$ d' /usr/jails/"${JAILNAME}"/etc/ntp.conf
 	sed -i '' '$ d' /usr/jails/"${JAILNAME}"/etc/ntp.conf
 
-	# remove last 2 lines from sshd_config added during install
+	# remove last 2 lines from sshd_config containing binded ip address
 	sed -i '' '$ d' /usr/jails/"${JAILNAME}"/etc/ssh/sshd_config
 	sed -i '' '$ d' /usr/jails/"${JAILNAME}"/etc/ssh/sshd_config
 
