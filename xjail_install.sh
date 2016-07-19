@@ -407,7 +407,7 @@ if [ -z "${JAILNAME}" -o ! $? ]; then
 	exit 1
 fi
 
-NUMJAILS=`cat ./jailnames | wc -w`
+NUMJAILS=`cat ./jailnames | wc -w | cut -w -f 2`
 IFACE=`cat ./hostiface`
 HOSTIP=`cat ./hostip`
 
