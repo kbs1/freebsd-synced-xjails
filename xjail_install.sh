@@ -113,6 +113,7 @@ configureipbinds()
 	JAILIP="${2}"
 
 	echog "Configuring sshd and ntpd to listen only on '${JAILNAME}' jail IPv4 address..."
+	echo >> /usr/jails/"${JAILNAME}"/etc/ssh/sshd_config
 	echo -n "ListenAddress ${JAILIP}" >> /usr/jails/"${JAILNAME}"/etc/ssh/sshd_config
 	echo "interface ignore wildcard" >> /usr/jails/"${JAILNAME}"/etc/ntp.conf
 	echo -n "interface listen ${JAILIP}" >> /usr/jails/"${JAILNAME}"/etc/ntp.conf
@@ -393,6 +394,8 @@ EOD
 	echo "${BASEROOT}" > basejail_root
 
 	echo 'ezjail_enable="YES"' >> /etc/rc.conf
+
+	echo -n "4" > ./stage
 fi
 
 # stage 4 - configure & install chosen jail name
@@ -474,45 +477,57 @@ UNISON_CMD2_SUDO_BATCH="/usr/local/bin/unison /usr/jails/${JAILNAME} ssh\://${SS
 UNISON_CMD2_SUDO_BATCH_FORCE_LOCAL="/usr/local/bin/unison /usr/jails/${JAILNAME} ssh\://${SSH}/${JAILROOT} -batch -force /usr/jails/${JAILNAME} -ignore Path etc/resolv.conf -ignore Path usr/local/etc/X11/xorg.conf.d -ignore Path etc/ssh/sshd_config -ignore Path etc/ntp.conf -ignore Path var/run -ignore Path var/spool -ignore Path tmp -owner -group -numericids -auto -times -sshargs ${SSHARGS}"
 UNISON_CMD2_SUDO_BATCH_FORCE_REMOTE="/usr/local/bin/unison /usr/jails/${JAILNAME} ssh\://${SSH}/${JAILROOT} -batch -force ssh\://${SSH}/${JAILROOT} -ignore Path etc/resolv.conf -ignore Path usr/local/etc/X11/xorg.conf.d -ignore Path etc/ssh/sshd_config -ignore Path etc/ntp.conf -ignore Path var/run -ignore Path var/spool -ignore Path tmp -owner -group -numericids -auto -times -sshargs ${SSHARGS}"
 
+# write xjail config script - all configuration in one place (included, no shebang)
+cat <<EOD > /home/"${USERNAME}"/xjail_config.sh
+JAILNAME="${JAILNAME}"
+USERNAME="${USERNAME}"
+UISTYLE="${UISTYLE}" # "xorg" or "console"
+DRIVER="${DRIVER}" # driver that should be kldloaded before entering the xjail, empty string for none
+NUMLOCK="numlock" # set this to 'numlock' to run numlockx after UI startup for UISTYLE "xorg"
+
+SSH="${SSH}"
+BASEROOT="${BASEROOT}"
+JAILROOT="${JAILROOT}"
+EOD
+
 # write master flow script - decides whether to use X sync UI or not (included from .profile, no shebang)
-cat <<EOD > /home/"${USERNAME}"/session_"${JAILNAME}"_flow.sh
+cat <<EOD > /home/"${USERNAME}"/xjail_flow.sh
 GREEN="[0;32m"
 YELLOW="[1;33m"
 RED="[0;31m"
 RESET="[0m"
 
+. ~/xjail_config.sh
+
 xorg_ui_before()
 {
-	xinit -bg black -fg white -maximized -e ~/session_${JAILNAME}_before.sh numlock
-	echo "startx" >> /usr/jails/${JAILNAME}/home/${USERNAME}/.profile
-	echo "exit" >> /usr/jails/${JAILNAME}/home/${USERNAME}/.profile
-	sudo ezjail-admin console -e "/usr/bin/login -f ${USERNAME}" '${JAILNAME}'
+	xinit -bg black -fg white -maximized -e ~/xjail_before.sh
+	echo "startx" >> /usr/jails/\${JAILNAME}/home/\${USERNAME}/.profile
+	echo "exit" >> /usr/jails/\${JAILNAME}/home/\${USERNAME}/.profile
+	sudo ezjail-admin console -e "/usr/bin/login -f \${USERNAME}" "\${JAILNAME}"
 }
 
 xorg_ui_after()
 {
-	sed -i '' '\$ d' /usr/jails/${JAILNAME}/home/${USERNAME}/.profile
-	sed -i '' '\$ d' /usr/jails/${JAILNAME}/home/${USERNAME}/.profile
-	xinit -bg black -fg white -maximized -e ~/session_${JAILNAME}_after.sh numlock
+	sed -i '' '\$ d' /usr/jails/\${JAILNAME}/home/\${USERNAME}/.profile
+	sed -i '' '\$ d' /usr/jails/\${JAILNAME}/home/\${USERNAME}/.profile
+	xinit -bg black -fg white -maximized -e ~/xjail_after.sh
 }
 
 console_ui_before()
 {
-	~/session_${JAILNAME}_before.sh
-	echo "" >> /usr/jails/${JAILNAME}/home/${USERNAME}/.profile
-	echo "" >> /usr/jails/${JAILNAME}/home/${USERNAME}/.profile
-	sudo ezjail-admin console -e "/usr/bin/login -f ${USERNAME}" '${JAILNAME}'
+	~/xjail_before.sh
+	echo "" >> /usr/jails/\${JAILNAME}/home/\${USERNAME}/.profile
+	echo "" >> /usr/jails/\${JAILNAME}/home/\${USERNAME}/.profile
+	sudo ezjail-admin console -e "/usr/bin/login -f \${USERNAME}" "\${JAILNAME}"
 }
 
 console_ui_after()
 {
-	sed -i '' '\$ d' /usr/jails/${JAILNAME}/home/${USERNAME}/.profile
-	sed -i '' '\$ d' /usr/jails/${JAILNAME}/home/${USERNAME}/.profile
-	~/session_${JAILNAME}_after.sh
+	sed -i '' '\$ d' /usr/jails/\${JAILNAME}/home/\${USERNAME}/.profile
+	sed -i '' '\$ d' /usr/jails/\${JAILNAME}/home/\${USERNAME}/.profile
+	~/xjail_after.sh
 }
-
-UISTYLE="${UISTYLE}"
-DRIVER="${DRIVER}"
 
 if [ -z "\${DRIVER}" ]; then
 	DRIVER_LOADED="false";
@@ -550,7 +565,7 @@ exit
 EOD
 
 # write session before script on host
-cat <<EOD > /home/"${USERNAME}"/session_"${JAILNAME}"_before.sh
+cat <<EOD > /home/"${USERNAME}"/xjail_before.sh
 #!/bin/sh
 
 GREEN="[0;32m"
@@ -558,16 +573,18 @@ YELLOW="[1;33m"
 RED="[0;31m"
 RESET="[0m"
 
+. ~/xjail_config.sh
+
 # turn on numlock if requested (running in X mode)
-if [ "${1}" == "numlock" ]; then
+if [ "${NUMLOCK}" == "numlock" -a "${UISTYLE}" == "xorg" ]; then
 	numlockx
 fi
 
 # always copy fresh /etc/resolv.conf to jail
-sudo cp /etc/resolv.conf /usr/jails/${JAILNAME}/etc/resolv.conf
+sudo cp /etc/resolv.conf /usr/jails/\${JAILNAME}/etc/resolv.conf
 
 echo
-read -p "\${YELLOW}Entering jail '${JAILNAME}'. Select an option [1]:
+read -p "\${YELLOW}Entering jail '\${JAILNAME}'. Select an option [1]:
 	1) Enter jail without syncing
 	2) Sync changes with server and enter jail
 	3) Sync changes with server (batch mode - no questions) and enter jail
@@ -592,26 +609,26 @@ case "\${ANSWER}" in
 	;;
 	4* ) echo "\${GREEN}Cloning changes from server to local machine (interactive mode)...\${RESET}"
 		SYNC="true"
-		FORCE1=" -force ssh://${SSH}/${BASEROOT}"
-		FORCE2=" -force ssh://${SSH}/${JAILROOT}"
+		FORCE1=" -force ssh://\${SSH}/\${BASEROOT}"
+		FORCE2=" -force ssh://\${SSH}/\${JAILROOT}"
 	;;
 	5* ) echo "\${GREEN}Cloning changes from server to local machine (batch mode)...\${RESET}"
 		SYNC="true"
 		BATCH_MODE=" -batch"
-		FORCE1=" -force ssh://${SSH}/${BASEROOT}"
-		FORCE2=" -force ssh://${SSH}/${JAILROOT}"
+		FORCE1=" -force ssh://\${SSH}/\${BASEROOT}"
+		FORCE2=" -force ssh://\${SSH}/\${JAILROOT}"
 	;;
 	6* )
-		read -p "\${YELLOW}DELETE current JAIL FS - are you sure? [N]\${RESET}" DELETE
+		read -p "\${RED}DELETE current JAIL FS - are you sure? [N]\${RESET}" DELETE
 		if [ "\${DELETE}" == "y" -o "\${DELETE}" == "Y" -o "\${DELETE}" == "yes" -o "\${DELETE}" == "YES" ]; then
 			SYNC="true"
-			echo "\${GREEN}Stopping '${JAILNAME}' jail...\${RESET}"
-			sudo ezjail-admin stop '${JAILNAME}'
+			echo "\${GREEN}Stopping '\${JAILNAME}' jail...\${RESET}"
+			sudo ezjail-admin stop '\${JAILNAME}'
 			echo "\${GREEN}Deleting current jail filesystem...\${RESET}"
 			sudo chflags -R 0 /usr/jails/basejail
 			sudo find /usr/jails/basejail -mindepth 1 -delete
-			sudo chflags -R 0 /usr/jails/"${JAILNAME}"
-			sudo find /usr/jails/"${JAILNAME}" -mindepth 1 -delete
+			sudo chflags -R 0 /usr/jails/"\${JAILNAME}"
+			sudo find /usr/jails/"\${JAILNAME}" -mindepth 1 -delete
 		else
 			read -p "\${GREEN}Aborting. Press return to enter jail.\${RESET}" DELETE
 		fi
@@ -622,11 +639,11 @@ case "\${ANSWER}" in
 esac
 
 SESSION_ENDING="false"
-. ~/session_${JAILNAME}_sync.sh
+. ~/xjail_sync.sh
 EOD
 
 # write session after script on host
-cat <<EOD > /home/"${USERNAME}"/session_"${JAILNAME}"_after.sh
+cat <<EOD > /home/"${USERNAME}"/xjail_after.sh
 #!/bin/sh
 
 GREEN="[0;32m"
@@ -634,13 +651,15 @@ YELLOW="[1;33m"
 RED="[0;31m"
 RESET="[0m"
 
+. ~/xjail_config.sh
+
 # turn on numlock if requested (running in X mode)
-if [ "${1}" == "numlock" ]; then
+if [ "${NUMLOCK}" == "numlock" -a "${UISTYLE}" == "xorg" ]; then
 	numlockx
 fi
 
 echo
-read -p "\${YELLOW}Session in jail '${JAILNAME}' ended. Select an option [1]:
+read -p "\${YELLOW}Session in jail '\${JAILNAME}' ended. Select an option [1]:
 	1) Log out
 	2) Sync changes with server (batch mode) and log out
 	3) Sync changes with server (batch mode) and reboot
@@ -665,12 +684,12 @@ case "\${ANSWER}" in
 	[567]* ) SYNC="true"
 		BATCH_MODE=" -batch"
 		FORCE1=" -force /usr/jails/basejail"
-		FORCE2=" -force /usr/jails/${JAILNAME}"
+		FORCE2=" -force /usr/jails/\${JAILNAME}"
 	;;
 esac
 
 SESSION_ENDING="true"
-. ~/session_${JAILNAME}_sync.sh
+. ~/xjail_sync.sh
 
 case "\${ANSWER}" in
 	[479]* ) sudo init 0;;
@@ -683,55 +702,59 @@ esac
 EOD
 
 # write sync script (included, no shebang)
-cat <<EOD > /home/"${USERNAME}"/session_"${JAILNAME}"_sync.sh
+cat <<EOD > /home/"${USERNAME}"/xjail_sync.sh
 if [ "\${SYNC}" == "true" ]; then
-	sudo ezjail-admin stop '${JAILNAME}'
+	sudo ezjail-admin stop "\${JAILNAME}"
 	sleep 5
 
 	if [ "\${SESSION_ENDING}" == "true" ]; then
 		echo "\${GREEN}Populating setuid and setgid permission index files...\${RESET}"
-		sudo ~/session_${JAILNAME}_dumpperms.sh
+		sudo ~/xjail_dumpperms.sh
 	fi
 
 	echo
 	echo "\${GREEN}Synchronizing basejail...\${RESET}"
 	${UNISON_CMD1}
 
-	echo "\${GREEN}Synchronizing '${JAILNAME}' jail...\${RESET}"
+	echo "\${GREEN}Synchronizing '\${JAILNAME}' jail...\${RESET}"
 	${UNISON_CMD2}
 
 	if [ "\${SESSION_ENDING}" == "false" ]; then
 		echo "\${GREEN}Synchronising setuid and setgid permissions...\${RESET}"
-		sudo ~/session_${JAILNAME}_setperms.sh
+		sudo ~/xjail_setperms.sh
 	fi
 
-	sudo ezjail-admin start '${JAILNAME}'
+	sudo ezjail-admin start "\${JAILNAME}"
 fi
 EOD
 
 # write dump perms script (run as root)
-cat <<EOD > /home/${USERNAME}/session_${JAILNAME}_dumpperms.sh
+cat <<EOD > /home/${USERNAME}/xjail_dumpperms.sh
 #!/bin/sh
 
-rm /usr/jails/basejail/.setuid_files /usr/jails/basejail/.setgid_files /usr/jails/${JAILNAME}/.setuid_files /usr/jails/${JAILNAME}/.setgid_files
+. ~/xjail_config.sh
+
+rm /usr/jails/basejail/.setuid_files /usr/jails/basejail/.setgid_files /usr/jails/\${JAILNAME}/.setuid_files /usr/jails/\${JAILNAME}/.setgid_files
 
 find /usr/jails/basejail -perm +4000 > /usr/jails/basejail/.setuid_files
 find /usr/jails/basejail -perm +2000 > /usr/jails/basejail/.setgid_files
 
-find /usr/jails/${JAILNAME} -perm +4000 > /usr/jails/${JAILNAME}/.setuid_files
-find /usr/jails/${JAILNAME} -perm +2000 > /usr/jails/${JAILNAME}/.setgid_files
+find /usr/jails/\${JAILNAME} -perm +4000 > /usr/jails/\${JAILNAME}/.setuid_files
+find /usr/jails/\${JAILNAME} -perm +2000 > /usr/jails/\${JAILNAME}/.setgid_files
 
-chmod 700 /usr/jails/basejail/.setuid_files /usr/jails/basejail/.setgid_files /usr/jails/${JAILNAME}/.setuid_files /usr/jails/${JAILNAME}/.setgid_files
+chmod 700 /usr/jails/basejail/.setuid_files /usr/jails/basejail/.setgid_files /usr/jails/\${JAILNAME}/.setuid_files /usr/jails/\${JAILNAME}/.setgid_files
 EOD
 
 # write set perms script (run as root)
-cat <<EOD > /home/${USERNAME}/session_${JAILNAME}_setperms.sh
+cat <<EOD > /home/${USERNAME}/xjail_setperms.sh
 #!/bin/sh
 
-chflags -R 0 /usr/jails/basejail
-chflags -R 0 /usr/jails/"${JAILNAME}"
+. ~/xjail_config.sh
 
-cat /usr/jails/basejail/.setuid_files /usr/jails/${JAILNAME}/.setuid_files > ~/.setuid_files
+chflags -R 0 /usr/jails/basejail
+chflags -R 0 /usr/jails/"\${JAILNAME}"
+
+cat /usr/jails/basejail/.setuid_files /usr/jails/\${JAILNAME}/.setuid_files > ~/.setuid_files
 while IFS= read -r FILE; do
 	if [ -f "\${FILE}" ]; then
 		RPATH=\`realpath "\${FILE}"\`
@@ -748,7 +771,7 @@ while IFS= read -r FILE; do
 done < ~/.setuid_files
 rm ~/.setuid_files
 
-cat /usr/jails/basejail/.setgid_files /usr/jails/${JAILNAME}/.setgid_files > ~/.setgid_files
+cat /usr/jails/basejail/.setgid_files /usr/jails/\${JAILNAME}/.setgid_files > ~/.setgid_files
 while IFS= read -r FILE; do
 	if [ -f "\${FILE}" ]; then
 		RPATH=\`realpath "\${FILE}"\`
@@ -766,16 +789,16 @@ done < ~/.setgid_files
 rm ~/.setgid_files
 EOD
 
-chown "${USERNAME}":"${USERNAME}" /home/"${USERNAME}"/session_"${JAILNAME}"_*.sh
-chmod +x /home/"${USERNAME}"/session_"${JAILNAME}"_*.sh
+chown "${USERNAME}":"${USERNAME}" /home/"${USERNAME}"/xjail_*.sh
+chmod +x /home/"${USERNAME}"/xjail_*.sh
 
-chown root:wheel /home/${USERNAME}/session_${JAILNAME}_dumpperms.sh
-chown root:wheel /home/${USERNAME}/session_${JAILNAME}_setperms.sh
-chmod 700 /home/${USERNAME}/session_${JAILNAME}_dumpperms.sh
-chmod 700 /home/${USERNAME}/session_${JAILNAME}_setperms.sh
+chown root:wheel /home/${USERNAME}/xjail_dumpperms.sh
+chown root:wheel /home/${USERNAME}/xjail_setperms.sh
+chmod 700 /home/${USERNAME}/xjail_dumpperms.sh
+chmod 700 /home/${USERNAME}/xjail_setperms.sh
 
 echog "Altering host .profile script for user '${USERNAME}'..."
-echo ". session_${JAILNAME}_flow.sh" >> /home/"${USERNAME}"/.profile
+echo ". ~/xjail_flow.sh" >> /home/"${USERNAME}"/.profile
 
 echog "Giving host system user '${USERNAME}' necessary sudo privileges..."
 echo "${USERNAME} ALL=(ALL) NOPASSWD: /usr/local/bin/ezjail-admin console -e /usr/bin/login -f ${USERNAME} ${JAILNAME}" >> /usr/local/etc/sudoers
@@ -800,8 +823,8 @@ echo "${USERNAME} ALL=(ALL) NOPASSWD: /bin/chflags -R 0 /usr/jails/basejail" >> 
 echo "${USERNAME} ALL=(ALL) NOPASSWD: /usr/bin/find /usr/jails/basejail -mindepth 1 -delete" >> /usr/local/etc/sudoers
 echo "${USERNAME} ALL=(ALL) NOPASSWD: /bin/chflags -R 0 /usr/jails/${JAILNAME}" >> /usr/local/etc/sudoers
 echo "${USERNAME} ALL=(ALL) NOPASSWD: /usr/bin/find /usr/jails/${JAILNAME} -mindepth 1 -delete" >> /usr/local/etc/sudoers
-echo "${USERNAME} ALL=(ALL) NOPASSWD: /home/${USERNAME}/session_${JAILNAME}_dumpperms.sh" >> /usr/local/etc/sudoers
-echo "${USERNAME} ALL=(ALL) NOPASSWD: /home/${USERNAME}/session_${JAILNAME}_setperms.sh" >> /usr/local/etc/sudoers
+echo "${USERNAME} ALL=(ALL) NOPASSWD: /home/${USERNAME}/xjail_dumpperms.sh" >> /usr/local/etc/sudoers
+echo "${USERNAME} ALL=(ALL) NOPASSWD: /home/${USERNAME}/xjail_setperms.sh" >> /usr/local/etc/sudoers
 echo "${USERNAME} ALL=(ALL) NOPASSWD: /bin/cp /etc/resolv.conf /usr/jails/${JAILNAME}/etc/resolv.conf" >> /usr/local/etc/sudoers
 
 echo $YELLOW
@@ -809,6 +832,8 @@ read -p "${YELLOW}Populate jail '${JAILNAME}' from remote server? Answering no h
 echo $RESET
 
 if [ "${ANSWER}" == "y" -o "${ANSWER}" == "Y" -o "${ANSWER}" == "YES" -o "${ANSWER}" == "yes" -o "${ANSWER}" == "Yes" ]; then
+	# populate jail from remote server
+
 	chflags -R 0 /usr/jails/basejail
 	find /usr/jails/basejail -mindepth 1 -delete
 	chflags -R 0 /usr/jails/"${JAILNAME}"
@@ -823,9 +848,13 @@ if [ "${ANSWER}" == "y" -o "${ANSWER}" == "Y" -o "${ANSWER}" == "YES" -o "${ANSW
 	cp /etc/ssh/sshd_config /usr/jails/"${JAILNAME}"/etc/ssh/sshd_config
 	cp /etc/ntp.conf /usr/jails/"${JAILNAME}"/etc/ntp.conf
 
-	# remove last 2 lines from ntp.conf added earlier
+	# remove last 2 lines from ntp.conf added during install
 	sed -i '' '$ d' /usr/jails/"${JAILNAME}"/etc/ntp.conf
 	sed -i '' '$ d' /usr/jails/"${JAILNAME}"/etc/ntp.conf
+
+	# remove last 2 lines from sshd_config added during install
+	sed -i '' '$ d' /usr/jails/"${JAILNAME}"/etc/ssh/sshd_config
+	sed -i '' '$ d' /usr/jails/"${JAILNAME}"/etc/ssh/sshd_config
 
 	# write jail specific information into copied config files
 	configureipbinds "${JAILNAME}" "${JAILIP}"
@@ -834,6 +863,7 @@ if [ "${ANSWER}" == "y" -o "${ANSWER}" == "Y" -o "${ANSWER}" == "YES" -o "${ANSW
 	ezjail-admin start "${JAILNAME}"
 
 else
+	# create a new stock jail
 	addjailmounts "${JAILNAME}"
 	configureipbinds "${JAILNAME}" "${JAILIP}"
 
@@ -868,7 +898,6 @@ else
 	sed -i '' '/^xclock.*/d' /usr/jails/"${JAILNAME}"/usr/local/etc/X11/xinit/xinitrc
 	sed -i '' '/^xterm.*/d' /usr/jails/"${JAILNAME}"/usr/local/etc/X11/xinit/xinitrc
 	sed -i '' '/^exec.*/d' /usr/jails/"${JAILNAME}"/usr/local/etc/X11/xinit/xinitrc
-	echo "esd -terminate -nobeeps -as 2" >> /usr/jails/"${JAILNAME}"/usr/local/etc/X11/xinit/xinitrc
 
 	echog "Configuring xinit to raise mixer volume on startup..."
 	echo "mixer vol 100" >> /usr/jails/"${JAILNAME}"/usr/local/etc/X11/xinit/xinitrc
