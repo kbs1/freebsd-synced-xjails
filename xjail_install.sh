@@ -411,6 +411,7 @@ add path ttyv1 unhide
 add path ttyv8 unhide
 add path 'mixer*' unhide
 add path 'dsp*' unhide
+add path 'cd*' unhide
 EOD
 
 	# install base jail
