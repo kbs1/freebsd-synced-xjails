@@ -621,7 +621,11 @@ if [ "\${NUMLOCK}" == "numlock" -a "\${UISTYLE}" == "xorg" ]; then
 fi
 
 # always copy fresh /etc/resolv.conf to jail
+mkdir -p /usr/jails/\${JAILNAME}/etc
 sudo cp /etc/resolv.conf /usr/jails/\${JAILNAME}/etc/resolv.conf
+
+# always create tmp directory
+mkdir -p /usr/jails/\${JAILNAME}/tmp
 
 echo
 read -p "\${YELLOW}Entering jail '\${JAILNAME}'. Select an option [1]:
