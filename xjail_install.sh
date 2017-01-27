@@ -636,12 +636,16 @@ read -p "\${YELLOW}Entering jail '\${JAILNAME}'. Select an option [1]:
 	5) Clone changes from server (batch mode - no questions) and enter jail
 	6) Delete current jail FS on disk, resync from server and enter jail
 	7) Drop to shell\${RESET}
+
+Append 'b' to the end of your selection to also sync / clone the basejail!
+
 -->	" ANSWER
 
 BATCH_MODE=""
 FORCE1=""
 FORCE2=""
 SYNC="false"
+SYNC_BASEJAIL="false"
 
 case "\${ANSWER}" in
 	2* ) echo "\${GREEN}Syncing changes with server (interactive mode)...\${RESET}"
@@ -683,6 +687,12 @@ case "\${ANSWER}" in
 	;;
 esac
 
+case "\${ANSWER}" in
+	[234567]b* )
+		SYNC_BASEJAIL="true"
+	;;
+esac
+
 SESSION_ENDING="false"
 . ~/xjail_sync.sh
 EOD
@@ -715,12 +725,16 @@ read -p "\${YELLOW}Session in jail '\${JAILNAME}' ended. Select an option [1]:
 	8) Reboot
 	9) Shut down
 	0) Drop to shell\${RESET}
+
+Append 'b' to the end of your selection to also sync / clone the basejail!
+
 -->	" ANSWER
 
 BATCH_MODE=""
 FORCE1=""
 FORCE2=""
 SYNC="false"
+SYNC_BASEJAIL="false"
 
 case "\${ANSWER}" in
 	[234]* ) SYNC="true"
@@ -730,6 +744,12 @@ case "\${ANSWER}" in
 		BATCH_MODE=" -batch"
 		FORCE1=" -force /usr/jails/basejail"
 		FORCE2=" -force /usr/jails/\${JAILNAME}"
+	;;
+esac
+
+case "\${ANSWER}" in
+	[234567]b* )
+		SYNC_BASEJAIL="true"
 	;;
 esac
 
@@ -757,9 +777,11 @@ if [ "\${SYNC}" == "true" ]; then
 		sudo ~/xjail_dumpperms.sh
 	fi
 
-	echo
-	echo "\${GREEN}Synchronizing basejail...\${RESET}"
-	${UNISON_CMD1}
+	if [ "\${SYNC_BASEJAIL}" == "true" ]; then
+		echo
+		echo "\${GREEN}Synchronizing basejail...\${RESET}"
+		${UNISON_CMD1}
+	fi
 
 	echo "\${GREEN}Synchronizing '\${JAILNAME}' jail...\${RESET}"
 	${UNISON_CMD2}

@@ -81,7 +81,7 @@ set -e
 
 # download kernel patch
 echog "Downloading kernel XJAILS patch..."
-wget http://kbs-development.com/download/freebsd_"${VERSION}"_xjails.patch
+wget --no-check-certificate https://raw.githubusercontent.com/kbs1/freebsd-synced-xjails/master/freebsd_"${VERSION}"_xjails.patch
 
 # patch the kernel
 echog "Patching the kernel..."
