@@ -673,11 +673,14 @@ case "\${ANSWER}" in
 			BATCH_MODE=" -batch"
 			echo "\${GREEN}Stopping '\${JAILNAME}' jail...\${RESET}"
 			sudo ezjail-admin stop "\${JAILNAME}"
+			sleep 5
 			echo "\${GREEN}Deleting current jail filesystem...\${RESET}"
 			sudo chflags -R 0 /usr/jails/basejail
 			sudo find /usr/jails/basejail -mindepth 1 -delete
 			sudo chflags -R 0 /usr/jails/"\${JAILNAME}"
 			sudo find /usr/jails/"\${JAILNAME}" -mindepth 1 -delete
+			rm -fr /root/.unison/ar*
+			rm -fr /root/.unison/fp*
 		else
 			read -p "\${GREEN}Aborting. Press return to enter jail.\${RESET}" DELETE
 		fi
