@@ -286,6 +286,9 @@ EOD
 	read -p "${YELLOW}Please add current machine's hostname into you localhost pointing entries in /etc/hosts. Press enter to launch editor.${RESET}" TMP
 	$EDITOR /etc/hosts
 
+	echog "Installing ca_root_nss..."
+	pkg install ca_root_nss
+
 	echog "Fixing ntpd 'leapfile expired less than X days ago' problem and enabling ntpd leapfile fetching in /etc/defaults/periodic.conf..."
 	echo 'ntp_leapfile_sources="https://hpiers.obspm.fr/iers/bul/bulc/ntp/leap-seconds.list https://www.ietf.org/timezones/data/leap-seconds.list"' >> /etc/rc.conf
 	sed -i '' "s/daily_ntpd_leapfile_enable=\"NO\"/daily_ntpd_leapfile_enable=\"YES\"/g" /etc/defaults/periodic.conf
