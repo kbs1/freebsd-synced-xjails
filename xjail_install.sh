@@ -88,9 +88,11 @@ configurex()
 	echo 'EndSection' >> /usr/jails/"${JAILNAME}"/usr/local/etc/X11/xorg.conf.d/20-inputdevice.conf
 
 	echo
-	read -p "${YELLOW}Enter driver name that should be kldloaded on this machine *BEFORE* X is started up in the jail. Without the driver explicitly loaded, X won't be able to load the driver from within the jail. Commonly used drivers are: i915kms, radeon, nv. Leave empty if no kldload should be taking place before X init.${RESET} " DRIVER
+	read -p "${YELLOW}Enter kernel module name that should be kldloaded on this host *BEFORE* X is started up in the jail. This ensures X server having required modules once launched from jail. Commonly loaded modules: i915kms, radeon, nv, vboxguest. Leave empty if no kldload should be taking place before X init.${RESET} " DRIVER
 	echo
-	read -p "${YELLOW}Enter X11 driver name that should be used on this machine. Commonly used drivers are: intel, ati, nv. Leave empty if no specific Device configuration section should be written.${RESET} " XDRIVER
+	read -p "${YELLOW}Enter X11 driver name that should be used on this machine. Commonly used drivers are: intel, ati, nv, vboxvideo. Leave empty if no specific Device configuration section should be written.${RESET} " XDRIVER
+	echo
+	read -p "${YELLOW}Enter X11 input driver name that should be used on this machine. Commonly used drivers are: mouse, vboxmouse. Leave empty if no specific InputDevice configuration section should be written.${RESET} " XINPUTDRIVER
 
 	if [ ! -z "${DRIVER}" ]; then
 		echo "${USERNAME} ALL=(ALL) NOPASSWD: /sbin/kldload ${DRIVER}" >> /usr/local/etc/sudoers
@@ -103,6 +105,13 @@ configurex()
 		echo '	Identifier "Card0"' >> /usr/jails/"${JAILNAME}"/usr/local/etc/X11/xorg.conf.d/30-device.conf
 		echo "	Driver \"${XDRIVER}\"" >> /usr/jails/"${JAILNAME}"/usr/local/etc/X11/xorg.conf.d/30-device.conf
 		echo 'EndSection' >> /usr/jails/"${JAILNAME}"/usr/local/etc/X11/xorg.conf.d/30-device.conf
+	fi
+
+	if [ ! -z "${XINPUTDRIVER}" ]; then
+		echo 'Section "InputDevice"' > /usr/jails/"${JAILNAME}"/usr/local/etc/X11/xorg.conf.d/40-inputdevice.conf
+		echo '	Identifier "Mouse0"' >> /usr/jails/"${JAILNAME}"/usr/local/etc/X11/xorg.conf.d/40-inputdevice.conf
+		echo "	Driver \"${XINPUTDRIVER}\"" >> /usr/jails/"${JAILNAME}"/usr/local/etc/X11/xorg.conf.d/40-inputdevice.conf
+		echo 'EndSection' >> /usr/jails/"${JAILNAME}"/usr/local/etc/X11/xorg.conf.d/40-inputdevice.conf
 	fi
 }
 
@@ -287,7 +296,7 @@ EOD
 	$EDITOR /etc/hosts
 
 	echog "Installing ca_root_nss..."
-	pkg install ca_root_nss
+	yes | pkg install ca_root_nss
 
 	echog "Fixing ntpd 'leapfile expired less than X days ago' problem and enabling ntpd leapfile fetching in /etc/defaults/periodic.conf..."
 	echo 'ntp_leapfile_sources="https://hpiers.obspm.fr/iers/bul/bulc/ntp/leap-seconds.list https://www.ietf.org/timezones/data/leap-seconds.list"' >> /etc/rc.conf
@@ -301,7 +310,7 @@ EOD
 	echo >> /etc/ntp.conf
 	echo "interface ignore wildcard" >> /etc/ntp.conf
 	echo >> /etc/ntp.conf
-	echo -n "\ninterface listen ${CURHOSTIP}" >> /etc/ntp.conf
+	echo -n "interface listen ${CURHOSTIP}" >> /etc/ntp.conf
 
 	echog "Configuring syslog to operate in safe mode (logging only to hosts's filesystem)..."
 	echo 'syslogd_flags="-ss"' >> /etc/rc.conf
@@ -337,6 +346,7 @@ if [ "${STAGE}" == "2" ]; then
 	yes | pkg install dbus
 	yes | pkg install sudo
 	yes | pkg install unison-nox11
+	yes | pkg install virtualbox-ose-additions
 	if [ "${UISTYLE}" == "xorg" ]; then
 		yes | pkg install Xorg
 		yes | pkg install numlockx
@@ -405,6 +415,7 @@ add path dri unhide
 add path 'dri/*' unhide
 add path io unhide
 add path 'nvidia*' unhide
+add path 'vbox*' unhide
 add path sysmouse unhide
 add path mem unhide
 add path pci unhide
@@ -415,6 +426,9 @@ add path ttyv8 unhide
 add path 'mixer*' unhide
 add path 'dsp*' unhide
 add path 'cd*' unhide
+
+[system=10]
+add path 'usb/*' mode 0660 group operator
 EOD
 
 	# install base jail
@@ -966,6 +980,12 @@ else
 	jexec "${JAILNAME}" /bin/tcsh -c 'setenv ASSUME_ALWAYS_YES yes; pkg install nano'
 	jexec "${JAILNAME}" /bin/tcsh -c 'setenv ASSUME_ALWAYS_YES yes; pkg install xorg'
 	jexec "${JAILNAME}" /bin/tcsh -c 'setenv ASSUME_ALWAYS_YES yes; pkg install lxde-meta'
+
+	echog "Installing VirtualBox guest support inside '${JAILNAME}' jail..."
+	jexec "${JAILNAME}" /bin/tcsh -c 'setenv ASSUME_ALWAYS_YES yes; pkg install virtualbox-ose-additions'
+	echo 'vboxguest_enable="YES"' >> /usr/jails/"${JAILNAME}"/etc/rc.conf
+	echo 'vboxservice_enable="YES"' >> /usr/jails/"${JAILNAME}"/etc/rc.conf
+	echo 'vboxservice_flags="--disable-timesync"' >> /usr/jails/"${JAILNAME}"/etc/rc.conf
 
 	echog "Configuring xinit to start LXDE automatically..."
 	sed -i '' '/^twm.*/d' /usr/jails/"${JAILNAME}"/usr/local/etc/X11/xinit/xinitrc
