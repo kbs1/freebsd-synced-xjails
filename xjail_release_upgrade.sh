@@ -54,6 +54,8 @@ case "${STEP}" in
 		ezjail-admin update -u
 		umount /basejail
 		echog "Update done. Reboot your machine and continue with step 2."
+		echo
+		echog "If you get shared object errors at any later point, run 'pkg-static install -f pkg; pkg update; pkg upgrade' to fix ABI compatibility issues."
 	;;
 	2 ) read -p "${YELLOW}Enter release number you would like to upgrade to (for example 11.1, omit the -RELEASE suffix): ${RESET}" UPGRADETO
 		echog "Upgrading host system to ${UPGRADETO}-RELEASE..."
