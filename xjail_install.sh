@@ -819,7 +819,7 @@ EOD
 cat <<EOD > /home/${USERNAME}/xjail_dumpperms.sh
 #!/bin/sh
 
-. ~/xjail_config.sh
+. /home/${USERNAME}/xjail_config.sh
 
 rm /usr/jails/basejail/.setuid_files /usr/jails/basejail/.setgid_files /usr/jails/\${JAILNAME}/.setuid_files /usr/jails/\${JAILNAME}/.setgid_files
 
@@ -836,7 +836,7 @@ EOD
 cat <<EOD > /home/${USERNAME}/xjail_setperms.sh
 #!/bin/sh
 
-. ~/xjail_config.sh
+. /home/${USERNAME}/xjail_config.sh
 
 chflags -R 0 /usr/jails/basejail
 chflags -R 0 /usr/jails/"\${JAILNAME}"
