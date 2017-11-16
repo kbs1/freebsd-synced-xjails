@@ -55,8 +55,6 @@ case "${STEP}" in
 		ezjail-admin update -u
 		umount /basejail
 		echog "Update done. Reboot your machine and continue with step 2."
-		echo
-		echog "If you get shared object errors at any later point, run 'pkg-static install -f pkg; pkg update; pkg upgrade' to fix ABI compatibility issues."
 	;;
 	2 ) read -p "${YELLOW}Enter release number you would like to upgrade to (for example 11.1, omit the -RELEASE suffix): ${RESET}" UPGRADETO
 		echog "Upgrading host system to ${UPGRADETO}-RELEASE..."
@@ -65,6 +63,8 @@ case "${STEP}" in
 		echo
 		echog "NOTE your previous system version you just upgraded from! ${VERSION}"
 		echog "Follow any instructions that were just displayed by freebsd-update install, reboot your machine and run 'freebsd-update install' until it prints there are no updates to install, and ALWAYS follow any instructions that are shown! When you are done, re-run this utility and continue with step 3."
+		echo
+		echog "If you get shared object errors at any later point, run 'pkg-static install -f pkg; pkg update; pkg upgrade' to fix ABI compatibility issues."
 	;;
 	3 )	echog "Upgrading basejail..."
 		read -p "${YELLOW}Enter PREVIOUS system release that you noted in previous step (for example 11.0, omit the -RELEASE suffix): ${RESET}" UPGRADEFROM
