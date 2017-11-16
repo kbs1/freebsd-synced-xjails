@@ -46,7 +46,8 @@ echo "======"
 case "${STEP}" in
 	1 ) echog "Updating host packages, system, and updating basejail..."
 		pkg update
-		pkg upgrade
+		yes | pkg upgrade
+		set +e
 		freebsd-update fetch
 		freebsd-update install
 		mkdir -p /basejail
@@ -71,7 +72,7 @@ case "${STEP}" in
 
 		echog "Deleting current release src..."
 		find /usr/src -mindepth 1 -delete
-		echog "Checking new release src..."
+		echog "Checking out new release src..."
 		svn co https://svn.freebsd.org/base/releng/"$VERSION" /usr/src --non-interactive --trust-server-cert-failures=unknown-ca
 		echo
 		echog "All done! Now run xjail_update.sh script to build new XJAILS kernel and update your ports tree. Continue as if this system release was installed from the beginning."
